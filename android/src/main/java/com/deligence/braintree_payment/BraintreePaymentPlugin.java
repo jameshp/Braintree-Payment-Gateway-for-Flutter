@@ -84,6 +84,7 @@ public class BraintreePaymentPlugin implements MethodCallHandler, ActivityResult
         Intent p = new Intent(this.context, PayPalFlowActivity.class);
         p.putExtra("clientToken", clientToken);
         p.putExtra("amount", amount);
+        activity.startActivityForResult(p, PAYPAL_REQUEST_CODE);
     }
 
     private void enableGooglePay(DropInRequest dropInRequest) {
