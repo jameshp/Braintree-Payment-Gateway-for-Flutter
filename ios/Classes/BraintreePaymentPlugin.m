@@ -8,6 +8,7 @@
 
 NSString *clientToken;
 NSString *amount;
+bool nameRequired = false;
 NSString *currency;
 BTAPIClient *braintreeClient;
 FlutterResult _flutterResult;
@@ -42,6 +43,7 @@ FlutterResult _flutterResult;
         _flutterResult = result;
         clientToken = call.arguments[@"clientToken"];
         amount =call.arguments[@"amount"];
+        nameRequired = call.arguments[@"nameRequired"];
         [self showDropIn:clientToken withResult:result];
     } else if ([@"startPayPalFlow" isEqualToString:call.method]) {
         _flutterResult = result;
@@ -71,7 +73,9 @@ FlutterResult _flutterResult;
 
 - (void)showDropIn:(NSString *)clientTokenOrTokenizationKey withResult:(FlutterResult)flutterResult {
     BTDropInRequest *request = [[BTDropInRequest alloc] init];
-    
+    if(nameRequired)
+        request.cardholderNameSetting = BTFormFieldRequired;
+
    BTDropInController *dropInController = [[BTDropInController alloc] initWithAuthorization:clientTokenOrTokenizationKey request:request handler:^(BTDropInController * _Nonnull controller, BTDropInResult * _Nullable result, NSError * _Nullable error) {
         
         if (error != nil) {

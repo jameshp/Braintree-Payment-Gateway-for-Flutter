@@ -9,6 +9,8 @@ import com.braintreepayments.api.dropin.DropInActivity;
 import com.braintreepayments.api.dropin.DropInRequest;
 import com.braintreepayments.api.dropin.DropInResult;
 import com.braintreepayments.api.models.GooglePaymentRequest;
+import com.braintreepayments.cardform.view.CardForm;
+
 import com.google.android.gms.wallet.TransactionInfo;
 import com.google.android.gms.wallet.WalletConstants;
 
@@ -29,11 +31,13 @@ public class BraintreePaymentPlugin implements MethodCallHandler, ActivityResult
     private static final int PAYPAL_REQUEST_CODE = 0x1338;
     String clientToken = "";
     String amount = "";
+    String googleMerchantId = "";
+    boolean inSandbox;
     boolean enableGooglePay;
     HashMap<String, String> map = new HashMap<String, String>();
-
     String payPalFlow = ""; //either "Vault" or "Checkout"
     BraintreeFragment mBraintreeFragment;
+
 
     public BraintreePaymentPlugin(Registrar registrar) {
         activity = registrar.activity();
@@ -52,6 +56,8 @@ public class BraintreePaymentPlugin implements MethodCallHandler, ActivityResult
             this.activeResult = result;
             this.clientToken = call.argument("clientToken");
             this.amount = call.argument("amount");
+            this.inSandbox = call.argument("inSandbox");
+            this.googleMerchantId = call.argument("googleMerchantId");
             this.enableGooglePay = call.argument("enableGooglePay");
             payNow();
         } else if (call.method.equals("startPayPalFlow")) {
@@ -65,36 +71,49 @@ public class BraintreePaymentPlugin implements MethodCallHandler, ActivityResult
         }
     }
 
-
     void payNow() {
         DropInRequest dropInRequest = new DropInRequest().clientToken(clientToken);
         if (enableGooglePay) {
+
             enableGooglePay(dropInRequest);
         }
         activity.startActivityForResult(dropInRequest.getIntent(context), REQUEST_CODE);
     }
 
-    void startPayPalFlow(){
-            Intent p = new Intent(this.context, PayPalFlowActivity.class);
-            p.putExtra("clientToken", clientToken);
-            p.putExtra("amount", amount);
-            activity.startActivityForResult(p, PAYPAL_REQUEST_CODE);
+    void startPayPalFlow() {
+        Intent p = new Intent(this.context, PayPalFlowActivity.class);
+        p.putExtra("clientToken", clientToken);
+        p.putExtra("amount", amount);
     }
 
     private void enableGooglePay(DropInRequest dropInRequest) {
-        GooglePaymentRequest googlePaymentRequest = new GooglePaymentRequest()
-                .transactionInfo(TransactionInfo.newBuilder()
-                        .setTotalPrice(amount)
-                        .setTotalPriceStatus(WalletConstants.TOTAL_PRICE_STATUS_FINAL)
-                        .setCurrencyCode("USD")
-                        .build())
-                .billingAddressRequired(true);
-        dropInRequest.googlePaymentRequest(googlePaymentRequest);
-        System.out.println("~~~~~~~~~~~~~~~~~~~~~~~~~~~ Running is the Google pay " + dropInRequest.toString());
+        if (inSandbox) {
+            GooglePaymentRequest googlePaymentRequest = new GooglePaymentRequest()
+                    .transactionInfo(TransactionInfo.newBuilder()
+                            .setTotalPrice(amount)
+                            .setTotalPriceStatus(WalletConstants.TOTAL_PRICE_STATUS_FINAL)
+                            .setCurrencyCode("USD")
+                            .build())
+                    .billingAddressRequired(true);
+            dropInRequest.googlePaymentRequest(googlePaymentRequest);
+        } else {
+            GooglePaymentRequest googlePaymentRequest = new GooglePaymentRequest()
+                    .transactionInfo(TransactionInfo.newBuilder()
+                            .setTotalPrice(amount)
+                            .setTotalPriceStatus(WalletConstants.TOTAL_PRICE_STATUS_FINAL)
+                            .setCurrencyCode("USD")
+                            .build())
+                    .billingAddressRequired(true)
+                    .googleMerchantId(googleMerchantId);
+            ;
+            dropInRequest.googlePaymentRequest(googlePaymentRequest);
+        }
     }
 
     @Override
-    public boolean onActivityResult(int requestCode, int resultCode, Intent data) {
+//     public boolean onActivityResult(int requestCode, int resultCode, Intent data) {
+    public boolean onActivityResult(int requestCode, int resultCode, Intent data)  {
+      if(activeResult == null) return false;
         switch (requestCode) {
             case REQUEST_CODE:
                 if (resultCode == Activity.RESULT_OK) {
@@ -107,7 +126,7 @@ public class BraintreePaymentPlugin implements MethodCallHandler, ActivityResult
                     } else {
                         map.put("status", "success");
                         map.put("message", "Payment Nonce is ready.");
-                        map.put("paymentNonce", paymentNonce);
+                        map.put("nonce", paymentNonce);
                         activeResult.success(map);
                     }
                 } else if (resultCode == Activity.RESULT_CANCELED) {
@@ -122,17 +141,17 @@ public class BraintreePaymentPlugin implements MethodCallHandler, ActivityResult
                 }
                 return true;
             case PAYPAL_REQUEST_CODE:
-                if(resultCode == PayPalFlowActivity.RESULT_OK){
+                if (resultCode == PayPalFlowActivity.RESULT_OK) {
                     String paymentNonce = data.getExtras().getString("nonce");
                     map.put("status", "success");
                     map.put("message", "Payment Nonce is ready.");
-                    map.put("paymentNonce", paymentNonce);
+                    map.put("nonce", paymentNonce);
                     activeResult.success(map);
-                } else if (resultCode == PayPalFlowActivity.RESULT_CANCELED){
+                } else if (resultCode == PayPalFlowActivity.RESULT_CANCELED) {
                     map.put("status", "canceled");
                     map.put("message", "Paypal Flow was canceled by user.");
                     activeResult.success(map);
-                } else if (resultCode == PayPalFlowActivity.RESULT_ERROR){
+                } else if (resultCode == PayPalFlowActivity.RESULT_ERROR) {
                     String errorMessage = data.getExtras().getString("ErrorMessage");
                     map.put("status", "fail");
                     map.put("message", errorMessage);

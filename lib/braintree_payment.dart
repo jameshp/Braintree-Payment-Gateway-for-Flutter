@@ -4,20 +4,50 @@ import 'package:flutter/services.dart';
 
 class BraintreePayment {
   static const MethodChannel _channel =
-      const MethodChannel('braintree_payment');
+  const MethodChannel('braintree_payment');
 
-  Future showDropIn({String nonce, String amount, bool enableGooglePay}) async {
+  Future showDropIn({String nonce = "",
+    String amount = "",
+    bool enableGooglePay = true,
+    bool inSandbox = true,
+    bool nameRequired = false,
+    String googleMerchantId = ""}) async {
     if (Platform.isAndroid) {
-      var result = await _channel.invokeMethod<Map>('showDropIn', {
-        'clientToken': nonce,
-        'amount': amount,
-        'enableGooglePay': enableGooglePay
-      });
+      var result;
+      if (inSandbox == false && googleMerchantId.isEmpty) {
+        print(
+            "ERROR BRAINTREE PAYMENT : googleMerchantId is required in production evnvironment");
+      } else if (nonce.isEmpty) {
+        print("ERROR BRAINTREE PAYMENT : Nonce cannot be empty");
+      } else if (amount.isEmpty) {
+        print("ERROR BRAINTREE PAYMENT : Amount cannot be empty");
+      } else if (inSandbox == false && googleMerchantId.isNotEmpty) {
+        result = await _channel.invokeMethod<Map>('showDropIn', {
+          'clientToken': nonce,
+          'amount': amount,
+          'enableGooglePay': enableGooglePay,
+          'inSandbox': inSandbox,
+          'nameRequired': nameRequired,
+          'googleMerchantId': googleMerchantId
+        });
+      } else if (inSandbox) {
+        result = await _channel.invokeMethod<Map>('showDropIn', {
+          'clientToken': nonce,
+          'amount': amount,
+          'inSandbox': inSandbox,
+          'nameRequired': nameRequired,
+          'enableGooglePay': enableGooglePay,
+          'googleMerchantId': googleMerchantId
+        });
+      }
       return result;
     } else {
-      print("-----------------Inside IOS-------------------------");
       String result = await _channel
-          .invokeMethod('showDropIn', {'clientToken': nonce, 'amount': amount});
+          .invokeMethod('showDropIn', {
+        'clientToken': nonce,
+        'amount': amount,
+        'nameRequired': nameRequired
+      });
       return result;
     }
   }
